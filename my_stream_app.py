@@ -30,7 +30,7 @@ stream_name = "Untitled-Stream"
 #format_code = "Hi59"
 #path = "DeckLink SDI 4K"
 encoder = f"-f video4linux2 -framerate 30 -video_size hd1080 -i {video_input1} -f alsa -ac 2 -i hw:1 "
-record_path = "/home/tyler/"
+record_path = ""
 
 resolution = 'hd1080'
 thread_queue = '1024'
@@ -48,9 +48,10 @@ v = 0
 y = 0
 a = 0
 q = 0
-t = 7
+t = 6
 pro = 2
 pre = 8
+stream = '0'
 class MyLayout(GridLayout):
     def __init__(self, **kwargs):
         global x
@@ -62,7 +63,7 @@ class MyLayout(GridLayout):
         self.z = 40
 
         self.startGrid = GridLayout()
-        self.startGrid.cols = 3
+        self.startGrid.cols = 5
         self.startGrid.padding = 4
         self.startGrid.spacing = 2
         self.startGrid.size_hint_y = .2
@@ -75,9 +76,17 @@ class MyLayout(GridLayout):
         self.streamName = TextInput(multiline=False, hint_text="Stream Name", size_hint_x=0.33, font_size=20)
         self.startGrid.add_widget(self.streamName)
 
+        self.recordPath = TextInput(multiline=False, hint_text="Record Path", size_hint_x=0.33, font_size=20)
+        self.startGrid.add_widget(self.recordPath)
+
         self.StopButton = Button(text='Stop Stream', background_color='gray', background_normal= '', size_hint_x=0.33, size_hint_y=0.1)
         self.startGrid.add_widget(self.StopButton)
         self.StopButton.bind(on_press=self.Stop)
+
+        self.recordViewButton = Button(text='View Recording', background_color='gray', background_normal='', size_hint_x=0.33,
+                                 size_hint_y=0.1)
+        self.startGrid.add_widget(self.recordViewButton)
+        self.recordViewButton.bind(on_press=self.recordView)
 
         self.PrevGrid = GridLayout()
         self.PrevGrid.cols = 4
@@ -142,7 +151,7 @@ class MyLayout(GridLayout):
         self.tuneGrid.add_widget(self.tune_label)
 
         self.tune1Button = Button(text='Film', background_color='yellow', size_hint_x=0.1)
-        self.tuneGrid.add_widget(self.tune1Button) 
+        self.tuneGrid.add_widget(self.tune1Button)
         self.tune1Button.bind(on_press=self.tune1)
 
         self.tune2Button = Button(text='Animation', background_color='gray', size_hint_x=0.1)
@@ -293,6 +302,7 @@ class MyLayout(GridLayout):
         self.threadQSet = TextInput(multiline=False, hint_text="ex. 512", font_size=20, size_hint_x=.1)
         self.settingsGrid.add_widget(self.threadQSet)
 
+        #self.error_check(self)
         self.detect_input(self)
         self.button_colors_loop(self)
 
@@ -308,8 +318,11 @@ class MyLayout(GridLayout):
         global crf
         global bitrate
         global keyframe
+        global stream_name
+        global i
 
         stream_name = self.streamName.text
+        record_path = self.recordPath.text
 
         if len(self.threadQSet.text) > 0:
             thread_queue = self.threadQSet.text
@@ -339,51 +352,109 @@ class MyLayout(GridLayout):
         if x > 0:
             p.kill()
             #q.kill()
-        x += 1
+
         time.sleep(.1)
         i = 0
 
-        while os.path.exists(f'{record_path}{stream_name}{i}.mp4'):
+        while os.path.exists(f'{record_path}/{stream_name}{i}.mp4'):
             i += 1
         ap = '"'
         ap2 = "'"
         x = 0
-        if self.rtmp1.text == "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
-            pass
+        print(i)
+        if self.recordPath.text != "":
+            if self.rtmp1.text == "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=mpegts]{record_path}/{stream_name}{i}.mp4"'
 
-        if self.rtmp1.text != "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
-            stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
-                     f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
-                     f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
-                     f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
-                     f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{record_path}{stream_name}{i}.mp4"'
+            if self.rtmp1.text != "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=mpegts]{record_path}/{stream_name}{i}.mp4"'
 
-            #preview = f'ffplay {record_path}{stream_name}{i}.mp4'
+                #preview = f'ffplay {record_path}{stream_name}{i}.mp4'
 
-            print(stream)
-            x = 1
-        if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text == "" and self.rtmp4.text == "":
-            stream = f'ffmpeg -f video4linux2 -framerate 30 -video_size hd1080 -i {video_input} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 -crf 20.0 -crf_max 25.0 -profile high444 -preset ultrafast -trellis 2 ' \
-                     f'-maxrate 2600k -bufsize 5200k -pix_fmt yuv420p -g 50 -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
-                     f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}|[f=flv]{record_path}{stream_name}{i}.mp4"'
-            print(stream)
-            x = 1
-        if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text == "":
-            stream = f'ffmpeg {encoder} -map 0 -flags +global_header -c:v libx264 -crf 20.0 -crf_max 25.0 -profile high444 -preset ultrafast -trellis 2 ' \
-                     f'-maxrate 2600k -bufsize 5200k -pix_fmt yuv420p -g 50 -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
-                     f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}|[f=flv]{self.rtmp3.text}/{self.key3.text}|[f=flv]{record_path}{stream_name}{i}.mp4"'
-            print(stream)
-            x = 1
-        if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text != "":
-            stream = f'ffmpeg {encoder} -map 0 -flags +global_header -c:v libx264 -crf 20.0 -crf_max 25.0 -profile high444 -preset ultrafast -trellis 2 ' \
-                     f'-maxrate 2600k -bufsize 5200k -pix_fmt yuv420p -g 50 -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
-                     f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}|[f=flv]{self.rtmp3.text}/{self.key3.text}|[f=flv]{self.rtmp4.text}/{self.key4.text}|[f=flv]{record_path}{stream_name}{i}.mp4"'
-            print(stream)
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}|[f=mpegts]{record_path}/{stream_name}{i}.mp4"'
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}' \
+                         f'|[f=flv]{self.rtmp3.text}/{self.key3.text}|[f=mpegts]{record_path}/{stream_name}{i}.mp4"'
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text != "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}' \
+                         f'|[f=flv]{self.rtmp3.text}/{self.key3.text}|[f=flv]{self.rtmp4.text}/{self.key4.text}' \
+                         f'|[f=mpegts]{record_path}/{stream_name}{i}.mp4"'
+                print(stream)
+
+        else:
+            if self.rtmp1.text == "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                pass
+
+            if self.rtmp1.text != "" and self.rtmp2.text == "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}"'
+
+                # preview = f'ffplay {record_path}{stream_name}{i}.mp4'
+
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text == "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}"'
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text == "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}' \
+                         f'|[f=flv]{self.rtmp3.text}/{self.key3.text}"'
+                print(stream)
+                x = 1
+            if self.rtmp1.text != "" and self.rtmp2.text != "" and self.rtmp3.text != "" and self.rtmp4.text != "":
+                stream = f'ffmpeg -thread_queue_size {thread_queue} -f video4linux2 -video_size hd1080 -i {video_input} ' \
+                         f'-thread_queue_size {thread_queue} -f alsa -ac 2 -i hw:1 -map 0 -flags +global_header -c:v libx264 ' \
+                         f'-crf {crf} -crf_max {float(crf) * 1.25} -profile {profile} -tune {tune} -preset {preset} -trellis 2 ' \
+                         f'-maxrate {bitrate}k -bufsize {str(int(bitrate) * 2)}k -pix_fmt yuv420p -r {framerate} -g {str(int(keyframe) * int(framerate))} -map 1 -c:a aac -b:a 160k -ac 2 -ar 44100 ' \
+                         f'-f tee "[f=flv]{self.rtmp1.text}/{self.key1.text}|[f=flv]{self.rtmp2.text}/{self.key2.text}' \
+                         f'|[f=flv]{self.rtmp3.text}/{self.key3.text}|[f=flv]{self.rtmp4.text}/{self.key4.text}"'
+                print(stream)
 
         #os.system(stream)
         if x > 0:
             p = subprocess.Popen("exec " + stream, stdout=subprocess.PIPE, shell=True)
             #q = subprocess.Popen("exec " + preview, stdout=subprocess.PIPE, shell=True)
+
+
 
         # with open(f'{stream_name}.py', 'w') as f:
         #     f.write("import os\nfrom os.path import exists\ni = 0\nwhile os.path.exists(f'"f'/home/tyler/live_stream/{stream_name}'"{i}.mp4'):\n    i += 1\nfilename = f'"f'{stream_name}'"{i}.mp4'\nstream = f'"f'{stream}'"|[f=flv]/home/hpstream/Desktop/StreamArchive/{filename}"f'{ap}'f'{ap2}'"\ninput('Press enter to start stream, Ctrl-c to quit')\nos.system(stream)")
@@ -393,11 +464,13 @@ class MyLayout(GridLayout):
        #global q
         self.StartButton.text="Start Stream"
         self.StartButton.background_color='gray'
-        p.kill()
+        if p != 0:
+            p.kill()
         #q.kill()
 
 
     def Preview(self, instance):
+        global c
         global v
         video = f"ffmpeg -f video4linux2 -framerate {framerate} -video_size {resolution} -i {video_input} -pix_fmt yuv420p -f opengl 'Video Preview'"
         #video = f"ffmpeg -y -format_code {format_code} -f decklink -i '{path}' -pix_fmt yuv420p -f opengl 'Video Preview'"
@@ -408,6 +481,13 @@ class MyLayout(GridLayout):
         audio = f"ffmpeg -f alsa -ac 2 -i hw:1 -filter_complex showvolume -f opengl 'audio meter'"
         #audio = f"ffmpeg -y -format_code {format_code} -f decklink -i '{path}' -filter_complex showvolume -f opengl 'audio meter'"
         a = subprocess.Popen("exec " + audio, stdout=subprocess.PIPE, shell=True)
+
+    def recordView(self, instance):
+        global stream_name
+        global i
+        record = f"mpv --start=90% {self.recordPath.text}/{stream_name}{i}.mp4"
+        # video = f"ffmpeg -y -format_code {format_code} -f decklink -i '{path}' -pix_fmt yuv420p -f opengl 'Video Preview'"
+        r = subprocess.Popen("exec " + record, stdout=subprocess.PIPE, shell=True)
 
     def tune1(self, instance):
         global tune
@@ -541,6 +621,14 @@ class MyLayout(GridLayout):
     # def theadQ(self):
     #     global thread_queue
     #     thread_queue = self.threadQSet.text
+
+    # def error_check(self, instance):
+    #     global stream
+    #     cmd = [f'ffprobe -v quiet -print_format json -show_streams {stream}']
+    #     health = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+    #     stream_health = health.communicate()[0]
+    #     print(stream_health)
+    #     errorClock = Clock.schedule_once(self.error_check, 2)
 
     def button_colors_loop(self, instance):
         global t
